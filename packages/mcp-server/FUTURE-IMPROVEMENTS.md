@@ -42,24 +42,20 @@ Currently, `tlaplus_mcp_sany_modules` only scans filesystem directories. Standar
 4. Update `tlaplus_mcp_sany_modules` tool
 
 ### 3. Unit Test Suite
-**Status:** Manual tests only
+**Status:** Implemented (utilities + integration); tools/server coverage pending
 **Effort:** Medium
 **Impact:** High
 
-Add comprehensive automated tests:
+Automated Jest tests are now in place for the cross-platform utility layer:
 
-- Unit tests for all utility functions
-- Mock Java execution for faster tests
-- Test error handling paths
-- Test path validation edge cases
-- Test MCP protocol compliance
+- Unit tests cover `src/utils/{paths,java,sany}.ts`
+- Integration tests cover key utility workflows
+- Java execution is mocked for unit tests
+- Coverage thresholds enforced (scoped to core utility files)
 
-**Framework:** Jest or Node.js built-in test runner
-
-**Test Coverage Goals:**
-- Utilities: >80%
-- Tools: >70%
-- Integration: Key workflows
+Remaining work (optional):
+- Add tests for `src/tools/*` and `src/server.ts`
+- Add MCP protocol compliance tests (tool registration, schemas, error mapping)
 
 ## Medium Priority
 
@@ -164,15 +160,19 @@ When ready to publish:
 - Write migration guide
 
 ### 10. Cross-Platform Testing
-**Status:** Tested on macOS only
+**Status:** CI matrix added; real-world validation pending
 **Effort:** Low
 **Impact:** Medium
 
-Verify on other platforms:
+CI now runs the MCP server test suite on:
+- Windows, Linux (Ubuntu), macOS
+- Node.js 18, 20, 22
+- Java 17 (Temurin)
 
-- Windows (different path separators, Java locations)
-- Linux (various distributions)
-- Different Node.js versions (18, 20, 21)
+Remaining validation (manual / real-world):
+- Verify global install path detection on real Windows/Linux environments
+- Verify Java detection on Intel macOS + Apple Silicon macOS
+- Verify Windows process termination behavior in real shells (beyond mocks)
 
 ### 11. Performance Optimization
 **Status:** Not profiled
@@ -265,4 +265,4 @@ Features are prioritized based on:
 
 ---
 
-Last updated: 2026-01-21
+Last updated: 2026-01-22

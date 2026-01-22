@@ -3,6 +3,7 @@
 **Project:** Standalone MCP Server for TLA+ Tools
 **Status:** ✅ Complete (Not Published)
 **Date Completed:** 2026-01-21
+**Last Updated:** 2026-01-22 (Jest automated tests + CI matrix added; real-world validation pending)
 
 ## Overview
 
@@ -54,6 +55,9 @@ Successfully implemented a fully functional Model Context Protocol (MCP) server 
 - Documented all 6 tools and 20 resources
 - Created TEST-RESULTS.md with detailed test coverage
 - Verified both stdio and HTTP transport modes
+- Added Jest unit + integration tests for core cross-platform utilities
+- Added GitHub Actions CI job for MCP server (matrix); real-world validation pending
+- Added TESTING.md and updated README with test commands and badges
 
 ## Deliverables
 
@@ -62,30 +66,39 @@ Successfully implemented a fully functional Model Context Protocol (MCP) server 
 ```
 packages/mcp-server/
 ├── src/
-│   ├── cli.ts                 # CLI argument parsing
-│   ├── index.ts              # Main entry point
-│   ├── server.ts             # MCP server implementation
-│   ├── types.ts              # TypeScript type definitions
+│   ├── __tests__/
+│   │   └── setup.ts            # Jest global setup
+│   ├── cli.ts                  # CLI argument parsing
+│   ├── index.ts                # Main entry point
+│   ├── server.ts               # MCP server implementation
+│   ├── types.ts                # TypeScript type definitions
 │   ├── tools/
-│   │   ├── knowledge.ts      # Knowledge base resources
-│   │   ├── sany.ts           # SANY tools (parse, symbol, modules)
-│   │   └── tlc.ts            # TLC tools (check, smoke, explore)
+│   │   ├── knowledge.ts        # Knowledge base resources
+│   │   ├── sany.ts             # SANY tools (parse, symbol, modules)
+│   │   └── tlc.ts              # TLC tools (check, smoke, explore)
 │   └── utils/
-│       ├── java.ts           # Java process execution
-│       ├── logging.ts        # Logging utilities
-│       ├── markdown.ts       # Markdown parsing
-│       ├── paths.ts          # Path resolution & validation
-│       ├── sany.ts           # SANY execution & parsing
-│       ├── tla-tools.ts      # TLA+ tools paths
-│       ├── tlc.ts            # TLC execution
-│       └── tlc-helpers.ts    # TLC helper functions
-├── test-specs/               # Test TLA+ specifications
-├── dist/                     # Compiled JavaScript
-├── package.json              # Package configuration
-├── tsconfig.json             # TypeScript configuration
-├── README.md                 # Complete documentation
-├── TEST-RESULTS.md           # Test results documentation
-└── IMPLEMENTATION-SUMMARY.md # This file
+│       ├── __tests__/
+│       │   ├── paths.test.ts
+│       │   ├── java.test.ts
+│       │   ├── sany.test.ts
+│       │   └── integration.test.ts
+│       ├── java.ts             # Java process execution
+│       ├── logging.ts          # Logging utilities
+│       ├── markdown.ts         # Markdown parsing
+│       ├── paths.ts            # Path resolution & validation
+│       ├── sany.ts             # SANY execution & parsing
+│       ├── tla-tools.ts        # TLA+ tools paths
+│       ├── tlc.ts              # TLC execution
+│       └── tlc-helpers.ts      # TLC helper functions
+├── test-specs/                 # Test TLA+ specifications
+├── dist/                       # Compiled JavaScript
+├── jest.config.js              # Jest configuration
+├── package.json                # Package configuration
+├── tsconfig.json               # TypeScript configuration
+├── README.md                   # Complete documentation
+├── TESTING.md                  # How to run/write tests
+├── TEST-RESULTS.md             # Test results documentation
+└── IMPLEMENTATION-SUMMARY.md   # This file
 ```
 
 ### MCP Tools (6)
@@ -123,7 +136,12 @@ All TLA+ knowledge base articles registered as resources:
 
 ## Test Results
 
-### Automated Tests
+### Jest Automated Tests
+- ✅ 4 test suites, 88 tests passing
+- ✅ Coverage thresholds enforced (scoped to core utility files)
+- ✅ Integration tests for the utility stack
+
+### Automated Spec Tests (fixtures)
 - ✅ 10 TLA+ specifications tested
 - ✅ 100% pass rate
 - ✅ Error detection working correctly
@@ -211,8 +229,8 @@ All TLA+ knowledge base articles registered as resources:
 ### High Priority
 1. **Symbol Extraction** - Complete implementation using XMLExporter
 2. **JAR Module Support** - Scan standard modules inside JAR files
-3. **Unit Tests** - Add comprehensive test suite with jest
-4. **CI/CD** - Automated testing and builds
+3. **Unit Tests** - ✅ Implemented for core utilities (tools/server coverage still future)
+4. **CI/CD** - ✅ CI matrix added; real-world validation pending
 
 ### Medium Priority
 1. **TLC Statistics** - Parse and expose model checking statistics
@@ -223,7 +241,7 @@ All TLA+ knowledge base articles registered as resources:
 ### Low Priority
 1. **Docker Image** - Containerized distribution
 2. **npm Publishing** - Publish to npm registry when ready
-3. **Windows Testing** - Verify on Windows platform
+3. **Windows Testing** - CI matrix added; real-world validation pending
 4. **Performance Optimization** - Profile and optimize hot paths
 
 ## Usage Example
