@@ -58,3 +58,47 @@ jobs:
       with:
         name: vscode-tlaplus-ci.vsix
         path: ${{ github.workspace }}/vscode-tlaplus-*.vsix
+
+  test-mcp-server:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macOS-latest, ubuntu-latest, windows-latest]
+        node-version: ['18', '20', '22']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Verify Java Installation
+      run: java -version
+
+    - name: Install MCP Server Dependencies
+      working-directory: packages/mcp-server
+      run: npm ci
+
+    - name: Build MCP Server
+      working-directory: packages/mcp-server
+      run: npm run build
+
+    - name: Run MCP Server Unit Tests
+      working-directory: packages/mcp-server
+      run: npm run test:ci
+
+    - name: Upload Coverage
+      if: matrix.os == 'ubuntu-latest' && matrix.node-version == '22'
+      uses: codecov/codecov-action@v3
+      with:
+        directory: packages/mcp-server/coverage
+        flags: mcp-server

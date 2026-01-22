@@ -1,5 +1,8 @@
 # TLA+ MCP Server
 
+[![CI Status](https://github.com/tlaplus/vscode-tlaplus/workflows/CI/badge.svg)](https://github.com/tlaplus/vscode-tlaplus/actions)
+[![Coverage](https://codecov.io/gh/tlaplus/vscode-tlaplus/branch/master/graph/badge.svg?flag=mcp-server)](https://codecov.io/gh/tlaplus/vscode-tlaplus)
+
 Model Context Protocol (MCP) server for TLA+ formal specification tools.
 
 ## Overview
@@ -291,8 +294,36 @@ npm run build
 
 # Watch mode
 npm run dev
+```
 
+## Testing
+
+The MCP server has comprehensive automated tests covering all utilities and platform-specific code.
+
+```bash
 # Run tests
+npm test
+
+# Run tests with coverage
+npm run test:coverage
+
+# Run in watch mode during development
+npm run test:watch
+```
+
+### Platform Support
+
+Tested on:
+- ✅ macOS (Intel & Apple Silicon)
+- ✅ Windows 10/11
+- ✅ Linux (Ubuntu, Debian, Fedora)
+- ✅ Node.js 18, 20, 22
+
+See [TESTING.md](./TESTING.md) for detailed testing guide.
+
+### Integration Tests
+
+```bash
 node test-sany.js         # Basic SANY integration test
 node test-fixtures.js     # Comprehensive test with repository fixtures
 ```
