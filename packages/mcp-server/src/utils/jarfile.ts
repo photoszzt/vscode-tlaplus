@@ -217,3 +217,19 @@ export function extractJarDirectory(jarPath: string, innerDir: string): string {
   extractionCache.set(cacheKey, extractDir);
   return extractDir;
 }
+
+export function resolveJarfilePath(uri: string): string {
+  const { jarPath, innerPath } = parseJarfileUri(uri);
+
+  if (!innerPath) {
+    throw new Error(`Cannot resolve jarfile URI without inner path: ${uri}`);
+  }
+
+  const innerDir = path.dirname(innerPath).replace(/\\/g, '/');
+  const fileName = path.basename(innerPath);
+
+  const normalizedDir = innerDir === '.' ? '' : innerDir;
+  const extractedDir = extractJarDirectory(jarPath, normalizedDir);
+
+  return path.join(extractedDir, fileName);
+}

@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import AdmZip from 'adm-zip';
-import { parseJarfileUri, listJarEntries, listTlaModulesInJar, extractJarEntry, extractJarDirectory, clearJarCache } from '../jarfile';
+import { parseJarfileUri, listJarEntries, listTlaModulesInJar, extractJarEntry, extractJarDirectory, clearJarCache, resolveJarfilePath } from '../jarfile';
 
 let tempDir: string;
 let testJarPath: string;
@@ -163,6 +163,31 @@ describe('jarfile utilities', () => {
       const dir1 = extractJarDirectory(testJarPath, 'StandardModules');
       const dir2 = extractJarDirectory(testJarPath, 'StandardModules');
       expect(dir1).toBe(dir2);
+    });
+  });
+
+  describe('resolveJarfilePath', () => {
+    beforeEach(() => {
+      clearJarCache();
+    });
+
+    it('extracts module and its directory, returns filesystem path', () => {
+      const uri = `jarfile:${testJarPath}!/StandardModules/Naturals.tla`;
+      const fsPath = resolveJarfilePath(uri);
+
+      expect(fs.existsSync(fsPath)).toBe(true);
+      expect(fsPath.endsWith('Naturals.tla')).toBe(true);
+
+      const dir = path.dirname(fsPath);
+      expect(fs.existsSync(path.join(dir, 'Sequences.tla'))).toBe(true);
+    });
+
+    it('handles root-level modules', () => {
+      const uri = `jarfile:${testJarPath}!/RootModule.tla`;
+      const fsPath = resolveJarfilePath(uri);
+
+      expect(fs.existsSync(fsPath)).toBe(true);
+      expect(path.basename(fsPath)).toBe('RootModule.tla');
     });
   });
 });
