@@ -15,7 +15,7 @@ This package provides a standalone MCP server that exposes TLA+ tools (SANY pars
 - **Model Checking** - Run exhaustive model checking with TLC to verify correctness properties
 - **Smoke Testing** - Quick random simulation to find violations without exhaustive state exploration
 - **Behavior Exploration** - Generate and inspect behavior traces of specified lengths
-- **Symbol Extraction** - Extract symbols from TLA+ modules (planned)
+- **Symbol Extraction** - Extract symbols from TLA+ modules with TLC config suggestions
 - **Module Discovery** - List available TLA+ standard modules
 - **Knowledge Base** - Access 20+ articles on TLA+ best practices and common patterns
 
@@ -159,13 +159,60 @@ Parse /path/to/MySpec.tla
 ```
 
 #### `tlaplus_mcp_sany_symbol`
-Extract symbols from a TLA+ module (CONSTANTS, variables, operators).
+Extract symbols from a TLA+ module for TLC configuration file generation.
 
 **Parameters:**
 - `fileName` (string): Full path to the TLA+ file
-- `includeExtendedModules` (boolean, optional): Include symbols from extended modules
+- `includeExtendedModules` (boolean, optional): Include symbols from extended/instantiated modules
 
-**Note**: Symbol extraction requires XML parsing and will be implemented in a future update.
+**Response format (schemaVersion: 1):**
+
+```json
+{
+  "schemaVersion": 1,
+  "rootModule": "Counter",
+  "file": "/path/to/Counter.tla",
+  "includeExtendedModules": false,
+  "candidates": {
+    "constants": [{ "name": "MaxValue", "location": {...}, "comment": "..." }],
+    "variables": [{ "name": "count", "location": {...} }],
+    "statePredicates": [{ "name": "Init", "location": {...} }],
+    "actionPredicates": [{ "name": "Next", "location": {...} }],
+    "temporalFormulas": [{ "name": "Spec", "location": {...} }],
+    "operatorsWithArgs": [{ "name": "Add", "location": {...} }],
+    "theorems": [...],
+    "assumptions": [...]
+  },
+  "bestGuess": {
+    "init": { "name": "Init", "match": "exact", "reason": "root module exact match" },
+    "next": { "name": "Next", "match": "exact", "reason": "root module exact match" },
+    "spec": { "name": "Spec", "match": "exact", "reason": "root module exact match" },
+    "invariants": [{ "name": "TypeOK", "match": "contains", "reason": "..." }],
+    "properties": [{ "name": "Liveness", "match": "contains", "reason": "..." }]
+  },
+  "extendedModules": {
+    "Helper": { "candidates": {...} }
+  }
+}
+```
+
+**TLA+ Level meanings:**
+- Level 0: Constant expressions
+- Level 1: State expressions (can reference variables)
+- Level 2: Action expressions (can reference primed variables)
+- Level 3: Temporal formulas
+
+**bestGuess matching:**
+- `exact`: Exact name match (e.g., "Init")
+- `case_insensitive_exact`: Case-insensitive exact match
+- `prefix`: Name starts with expected prefix (e.g., "InitState")
+- `contains`: Name contains expected pattern
+- `fallback_first_candidate`: No name match, using first available candidate
+
+**Module preference in bestGuess:**
+1. Root module (highest priority)
+2. Extended non-stdlib modules
+3. Standard library modules (lowest priority, used as last resort)
 
 #### `tlaplus_mcp_sany_modules`
 List all available TLA+ standard modules.
