@@ -119,6 +119,43 @@ describe('SANY Tools', () => {
       expectMcpErrorResponse(response, 'Java not found');
     });
 
+    describe('jarfile: URI support', () => {
+      it('resolves jarfile: URI to filesystem before parsing', async () => {
+        (jarfile.resolveJarfilePath as jest.Mock).mockReturnValue('/tmp/cache/Naturals.tla');
+        (fs.existsSync as jest.Mock).mockReturnValue(true);
+        const mocks = mockSanySuccess();
+        (runSanyParse as jest.Mock).mockImplementation(mocks.runSanyParse);
+        (parseSanyOutput as jest.Mock).mockImplementation(mocks.parseSanyOutput);
+
+        const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_parse', {
+          fileName: 'jarfile:/tools/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla'
+        });
+
+        expect(jarfile.resolveJarfilePath).toHaveBeenCalledWith(
+          'jarfile:/tools/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla'
+        );
+        expect(runSanyParse).toHaveBeenCalledWith(
+          '/tmp/cache/Naturals.tla',
+          MINIMAL_CONFIG.toolsDir,
+          undefined
+        );
+        expectMcpTextResponse(response, 'No errors found');
+      });
+
+      it('returns error when jarfile resolution fails', async () => {
+        (jarfile.resolveJarfilePath as jest.Mock).mockImplementation(() => {
+          throw new Error('Entry not found in JAR');
+        });
+
+        const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_parse', {
+          fileName: 'jarfile:/tools/test.jar!/nonexistent.tla'
+        });
+
+        expectMcpErrorResponse(response, 'Error resolving jarfile URI');
+        expectMcpErrorResponse(response, 'Entry not found in JAR');
+      });
+    });
+
     it('uses javaHome from config when provided', async () => {
       const configWithJava = { ...MINIMAL_CONFIG, javaHome: '/custom/java' };
       await registerSanyTools(mockServer, configWithJava);

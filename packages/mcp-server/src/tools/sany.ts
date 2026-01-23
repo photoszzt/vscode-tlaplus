@@ -6,7 +6,7 @@ import { ServerConfig } from '../types';
 import { resolveAndValidatePath } from '../utils/paths';
 import { runSanyParse, parseSanyOutput } from '../utils/sany';
 import { extractSymbols } from '../utils/symbols';
-import { isJarfileUri, parseJarfileUri, listTlaModulesInJar } from '../utils/jarfile';
+import { isJarfileUri, parseJarfileUri, listTlaModulesInJar, resolveJarfilePath } from '../utils/jarfile';
 import { getModuleSearchPaths } from '../utils/tla-tools';
 
 /**
@@ -28,20 +28,6 @@ export async function registerSanyTools(
     },
     async ({ fileName }: { fileName: string }) => {
       try {
-        // Resolve and validate file path
-        const absolutePath = resolveAndValidatePath(fileName, config.workingDir);
-
-        // Check if file exists
-        if (!fs.existsSync(absolutePath)) {
-          return {
-            content: [{
-              type: 'text',
-              text: `File ${absolutePath} does not exist on disk.`
-            }]
-          };
-        }
-
-        // Ensure tools directory is configured
         if (!config.toolsDir) {
           return {
             content: [{
@@ -51,11 +37,34 @@ export async function registerSanyTools(
           };
         }
 
-        // Run SANY parser
+        let absolutePath: string;
+
+        if (isJarfileUri(fileName)) {
+          try {
+            absolutePath = resolveJarfilePath(fileName);
+          } catch (err) {
+            return {
+              content: [{
+                type: 'text',
+                text: `Error resolving jarfile URI: ${err instanceof Error ? err.message : String(err)}`
+              }]
+            };
+          }
+        } else {
+          absolutePath = resolveAndValidatePath(fileName, config.workingDir);
+          if (!fs.existsSync(absolutePath)) {
+            return {
+              content: [{
+                type: 'text',
+                text: `File ${absolutePath} does not exist on disk.`
+              }]
+            };
+          }
+        }
+
         const procInfo = await runSanyParse(absolutePath, config.toolsDir, config.javaHome || undefined);
         const result = await parseSanyOutput(procInfo);
 
-        // Format the result
         if (result.success) {
           return {
             content: [{
