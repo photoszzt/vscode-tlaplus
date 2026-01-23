@@ -5,22 +5,18 @@ This document tracks potential enhancements and features that could be added to 
 ## High Priority
 
 ### 1. Complete Symbol Extraction Tool
-**Status:** Placeholder implemented
+**Status:** ✅ Implemented
 **Effort:** Medium
 **Impact:** High
 
-The `tlaplus_mcp_sany_symbol` tool currently returns a message explaining it's not implemented. To complete it:
+The `tlaplus_mcp_sany_symbol` tool now:
 
-- Run `tla2sany.xml.XMLExporter` instead of SANY
-- Parse XML output to extract symbols
-- Group symbols by type (CONSTANTS, VARIABLES, operators, etc.)
-- Return structured JSON with all symbol information
-
-**Implementation Path:**
-1. Create `src/utils/xml-exporter.ts` with XML execution
-2. Add XML parsing library (e.g., `xml2js`)
-3. Extract symbol information from parsed XML
-4. Update `tlaplus_mcp_sany_symbol` handler in `src/tools/sany.ts`
+- Runs `tla2sany.xml.XMLExporter` to extract symbols
+- Parses XML output with `fast-xml-parser`
+- Groups symbols into TLC-oriented categories (constants, variables, statePredicates, actionPredicates, temporalFormulas, operatorsWithArgs, theorems, assumptions)
+- Computes `bestGuess` for Init/Next/Spec with scoring (root module preferred, stdlib down-ranked)
+- Supports `includeExtendedModules` option for nested module output
+- Returns structured JSON with `schemaVersion: 1` for future compatibility
 
 ### 2. JAR Module Scanning
 **Status:** Filesystem-only scanning
