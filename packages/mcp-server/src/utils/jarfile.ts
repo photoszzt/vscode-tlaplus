@@ -49,3 +49,36 @@ export function parseJarfileUri(uri: string): ParsedJarfileUri {
 export function isJarfileUri(path: string): boolean {
   return path.startsWith('jarfile:');
 }
+
+import AdmZip from 'adm-zip';
+
+export function listJarEntries(jarPath: string, innerDir: string): string[] {
+  const zip = new AdmZip(jarPath);
+  const entries = zip.getEntries();
+
+  let normalizedDir = innerDir.replace(/\\/g, '/');
+  if (normalizedDir.endsWith('/')) {
+    normalizedDir = normalizedDir.slice(0, -1);
+  }
+
+  const prefix = normalizedDir ? normalizedDir + '/' : '';
+  const results: string[] = [];
+
+  for (const entry of entries) {
+    if (entry.isDirectory) continue;
+
+    const entryPath = entry.entryName.replace(/\\/g, '/');
+
+    if (prefix) {
+      if (!entryPath.startsWith(prefix)) continue;
+      const relativePath = entryPath.slice(prefix.length);
+      if (relativePath.includes('/')) continue;
+      results.push(relativePath);
+    } else {
+      if (entryPath.includes('/')) continue;
+      results.push(entryPath);
+    }
+  }
+
+  return results;
+}
