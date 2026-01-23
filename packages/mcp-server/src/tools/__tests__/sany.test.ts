@@ -127,4 +127,128 @@ describe('SANY Tools', () => {
       );
     });
   });
+
+  describe('tlaplus_mcp_sany_symbol', () => {
+    beforeEach(async () => {
+      await registerSanyTools(mockServer, MINIMAL_CONFIG);
+    });
+
+    it('returns symbols for valid TLA+ file', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      const symbolData = {
+        schemaVersion: 1,
+        constants: ['N'],
+        variables: ['x', 'y'],
+        statePredicates: ['Init', 'TypeOK'],
+        actionPredicates: ['Next'],
+        temporalFormulas: ['Spec'],
+        operatorsWithArgs: [],
+        theorems: [],
+        assumptions: [],
+        bestGuess: { init: 'Init', next: 'Next', spec: 'Spec' }
+      };
+      const mocks = mockExtractSymbolsSuccess(symbolData);
+      (extractSymbols as jest.Mock).mockImplementation(mocks.extractSymbols);
+
+      const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_symbol', {
+        fileName: '/mock/test.tla'
+      });
+
+      const parsed = JSON.parse(response.content[0].text);
+      expect(parsed.schemaVersion).toBe(1);
+      expect(parsed.constants).toContain('N');
+      expect(parsed.variables).toContain('x');
+      expect(parsed.bestGuess.init).toBe('Init');
+    });
+
+    it('respects includeExtendedModules flag', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      const mocks = mockExtractSymbolsSuccess();
+      (extractSymbols as jest.Mock).mockImplementation(mocks.extractSymbols);
+
+      await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_symbol', {
+        fileName: '/mock/test.tla',
+        includeExtendedModules: true
+      });
+
+      expect(extractSymbols).toHaveBeenCalledWith(
+        '/mock/test.tla',
+        MINIMAL_CONFIG.toolsDir,
+        true,
+        undefined
+      );
+    });
+
+    it('defaults includeExtendedModules to false', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      const mocks = mockExtractSymbolsSuccess();
+      (extractSymbols as jest.Mock).mockImplementation(mocks.extractSymbols);
+
+      await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_symbol', {
+        fileName: '/mock/test.tla'
+      });
+
+      expect(extractSymbols).toHaveBeenCalledWith(
+        '/mock/test.tla',
+        MINIMAL_CONFIG.toolsDir,
+        false,
+        undefined
+      );
+    });
+
+    it('returns error for missing file', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(false);
+
+      const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_symbol', {
+        fileName: '/mock/missing.tla'
+      });
+
+      expectMcpErrorResponse(response, 'does not exist');
+    });
+
+    it('returns error when tools directory not configured', async () => {
+      await registerSanyTools(mockServer, NO_TOOLS_CONFIG);
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+
+      const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_symbol', {
+        fileName: '/mock/test.tla'
+      });
+
+      expectMcpErrorResponse(response, 'tools directory not configured');
+    });
+
+    it('returns helpful error when extraction fails', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      const mocks = mockExtractSymbolsError('XML parsing failed');
+      (extractSymbols as jest.Mock).mockImplementation(mocks.extractSymbols);
+
+      const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_symbol', {
+        fileName: '/mock/test.tla'
+      });
+
+      expectMcpErrorResponse(response, 'Failed to extract symbols');
+      expectMcpErrorResponse(response, 'XML parsing failed');
+      expectMcpErrorResponse(response, 'This may indicate');
+    });
+
+    it('uses javaHome from config', async () => {
+      const configWithJava = { ...MINIMAL_CONFIG, javaHome: '/custom/java' };
+      await registerSanyTools(mockServer, configWithJava);
+
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      const mocks = mockExtractSymbolsSuccess();
+      (extractSymbols as jest.Mock).mockImplementation(mocks.extractSymbols);
+
+      await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_symbol', {
+        fileName: '/mock/test.tla'
+      });
+
+      expect(extractSymbols).toHaveBeenCalledWith(
+        '/mock/test.tla',
+        configWithJava.toolsDir,
+        false,
+        '/custom/java'
+      );
+    });
+  });
 });
