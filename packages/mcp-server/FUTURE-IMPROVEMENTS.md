@@ -19,23 +19,25 @@ The `tlaplus_mcp_sany_symbol` tool now:
 - Returns structured JSON with `schemaVersion: 1` for future compatibility
 
 ### 2. JAR Module Scanning
-**Status:** Filesystem-only scanning
+**Status:** ✅ Implemented
 **Effort:** Medium
 **Impact:** Medium
 
-Currently, `tlaplus_mcp_sany_modules` only scans filesystem directories. Standard modules are in JAR files.
+The `tlaplus_mcp_sany_modules` tool now:
 
-**Requirements:**
-- Read JAR file entries using JSZip or similar
-- Extract .tla files from JAR archives
-- Support jarfile:// URI scheme
-- Cache JAR contents for performance
+- Scans all module roots from `getModuleSearchPaths(toolsDir)` including `jarfile:` roots
+- Lists standard modules from `tla2tools.jar!/tla2sany/StandardModules/`
+- Lists community modules from `CommunityModules-deps.jar!/`
+- Returns full `jarfile:` URIs that can be passed directly to parse/symbol tools
+- Filters `.tla` files and excludes `_` prefixed internal modules
 
-**Implementation Path:**
-1. Add `jszip` dependency
-2. Update `src/utils/modules.ts` with JAR reading
-3. Implement caching mechanism
-4. Update `tlaplus_mcp_sany_modules` tool
+The `tlaplus_mcp_sany_parse` and `tlaplus_mcp_sany_symbol` tools now:
+
+- Accept `jarfile:` URIs as input
+- Automatically extract the module and its directory to a temp cache
+- Support `EXTENDS` by extracting sibling modules
+
+Implementation uses `adm-zip` for JAR reading with in-memory + on-disk caching for performance.
 
 ### 3. Unit Test Suite
 **Status:** ✅ Implemented (14 suites, 223 tests)
