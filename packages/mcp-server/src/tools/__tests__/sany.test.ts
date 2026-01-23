@@ -268,16 +268,65 @@ describe('SANY Tools', () => {
 
     it('returns helpful error when extraction fails', async () => {
       (fs.existsSync as jest.Mock).mockReturnValue(true);
-      const mocks = mockExtractSymbolsError('XML parsing failed');
-      (extractSymbols as jest.Mock).mockImplementation(mocks.extractSymbols);
+      (extractSymbols as jest.Mock).mockRejectedValue(new Error('Failed to parse XML'));
 
       const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_symbol', {
         fileName: '/mock/test.tla'
       });
 
       expectMcpErrorResponse(response, 'Failed to extract symbols');
-      expectMcpErrorResponse(response, 'XML parsing failed');
-      expectMcpErrorResponse(response, 'This may indicate');
+      expectMcpErrorResponse(response, 'Failed to parse XML');
+    });
+
+    describe('jarfile: URI support', () => {
+      it('resolves jarfile: URI to filesystem before extracting symbols', async () => {
+        (jarfile.resolveJarfilePath as jest.Mock).mockReturnValue('/tmp/cache/Naturals.tla');
+        (fs.existsSync as jest.Mock).mockReturnValue(true);
+        const symbolData = {
+          schemaVersion: 1,
+          moduleName: 'Naturals',
+          constants: [],
+          variables: [],
+          statePredicates: [],
+          actionPredicates: [],
+          temporalFormulas: [],
+          operatorsWithArgs: [],
+          theorems: [],
+          assumptions: [],
+          bestGuess: {}
+        };
+        const mocks = mockExtractSymbolsSuccess(symbolData);
+        (extractSymbols as jest.Mock).mockImplementation(mocks.extractSymbols);
+
+        const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_symbol', {
+          fileName: 'jarfile:/tools/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla'
+        });
+
+        expect(jarfile.resolveJarfilePath).toHaveBeenCalledWith(
+          'jarfile:/tools/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla'
+        );
+        expect(extractSymbols).toHaveBeenCalledWith(
+          '/tmp/cache/Naturals.tla',
+          MINIMAL_CONFIG.toolsDir,
+          false,
+          undefined
+        );
+        const parsed = JSON.parse(response.content[0].text);
+        expect(parsed.moduleName).toBe('Naturals');
+      });
+
+      it('returns error when jarfile resolution fails', async () => {
+        (jarfile.resolveJarfilePath as jest.Mock).mockImplementation(() => {
+          throw new Error('Entry not found in JAR');
+        });
+
+        const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_symbol', {
+          fileName: 'jarfile:/tools/test.jar!/nonexistent.tla'
+        });
+
+        expectMcpErrorResponse(response, 'Error resolving jarfile URI');
+        expectMcpErrorResponse(response, 'Entry not found in JAR');
+      });
     });
 
     it('uses javaHome from config', async () => {

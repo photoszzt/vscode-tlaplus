@@ -105,17 +105,6 @@ export async function registerSanyTools(
     },
     async ({ fileName, includeExtendedModules }: { fileName: string; includeExtendedModules?: boolean }) => {
       try {
-        const absolutePath = resolveAndValidatePath(fileName, config.workingDir);
-
-        if (!fs.existsSync(absolutePath)) {
-          return {
-            content: [{
-              type: 'text',
-              text: `File ${absolutePath} does not exist on disk.`
-            }]
-          };
-        }
-
         if (!config.toolsDir) {
           return {
             content: [{
@@ -123,6 +112,31 @@ export async function registerSanyTools(
               text: 'TLA+ tools directory not configured. Use --tools-dir to specify the location.'
             }]
           };
+        }
+
+        let absolutePath: string;
+
+        if (isJarfileUri(fileName)) {
+          try {
+            absolutePath = resolveJarfilePath(fileName);
+          } catch (err) {
+            return {
+              content: [{
+                type: 'text',
+                text: `Error resolving jarfile URI: ${err instanceof Error ? err.message : String(err)}`
+              }]
+            };
+          }
+        } else {
+          absolutePath = resolveAndValidatePath(fileName, config.workingDir);
+          if (!fs.existsSync(absolutePath)) {
+            return {
+              content: [{
+                type: 'text',
+                text: `File ${absolutePath} does not exist on disk.`
+              }]
+            };
+          }
         }
 
         const result = await extractSymbols(
