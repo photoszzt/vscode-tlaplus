@@ -5,6 +5,7 @@ import * as path from 'path';
 import { ServerConfig } from '../types';
 import { resolveAndValidatePath } from '../utils/paths';
 import { runSanyParse, parseSanyOutput } from '../utils/sany';
+import { extractSymbols } from '../utils/symbols';
 
 /**
  * Register all SANY tools with the MCP server
@@ -84,21 +85,17 @@ export async function registerSanyTools(
   );
 
   // Tool 2: Symbol extraction
-  // Note: This tool requires XMLExporter which is more complex to implement
-  // For now, we'll provide a placeholder that explains the limitation
   server.tool(
     'tlaplus_mcp_sany_symbol',
     'Extract all symbols from the given TLA+ module. Use this tool to identify the symbols defined in a TLA+ specification—such as when generating a TLC configuration file. It assists in determining the list of CONSTANTS, the initialization predicate, the next-state relation, the overall behavior specification (Spec), and any defined safety or liveness properties. Note: SANY expects the fully qualified file path to the TLA+ module.',
     {
-      fileName: z.string(),
-      includeExtendedModules: z.boolean().optional()
+      fileName: z.string().describe('The full path to the file containing the TLA+ module (including jarfile:... paths for modules inside JAR archives).'),
+      includeExtendedModules: z.boolean().optional().describe('If true, includes symbols from extended and instantiated modules. By default, only symbols from the current module are included.')
     },
     async ({ fileName, includeExtendedModules }: { fileName: string; includeExtendedModules?: boolean }) => {
       try {
-        // Resolve and validate file path
         const absolutePath = resolveAndValidatePath(fileName, config.workingDir);
 
-        // Check if file exists
         if (!fs.existsSync(absolutePath)) {
           return {
             content: [{
@@ -108,7 +105,6 @@ export async function registerSanyTools(
           };
         }
 
-        // Ensure tools directory is configured
         if (!config.toolsDir) {
           return {
             content: [{
@@ -118,20 +114,25 @@ export async function registerSanyTools(
           };
         }
 
-        // TODO: Implement symbol extraction using XML exporter
-        // This requires running tla2sany.xml.XMLExporter and parsing the XML output
+        const result = await extractSymbols(
+          absolutePath,
+          config.toolsDir,
+          includeExtendedModules ?? false,
+          config.javaHome || undefined
+        );
+
         return {
           content: [{
             type: 'text',
-            text: `Symbol extraction for ${absolutePath} is not yet implemented in the standalone MCP server. ` +
-              `This feature requires XML parsing of SANY output, which will be added in a future update.`
+            text: JSON.stringify(result, null, 2)
           }]
         };
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         return {
           content: [{
             type: 'text',
-            text: `Failed to retrieve document symbols: ${error instanceof Error ? error.message : String(error)}`
+            text: `Failed to extract symbols: ${errorMessage}\n\nThis may indicate:\n- The TLA+ file has syntax errors (run tlaplus_mcp_sany_parse first)\n- Java is not available or misconfigured\n- The TLA+ tools JAR is missing or corrupted`
           }]
         };
       }
