@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import AdmZip from 'adm-zip';
-import { parseJarfileUri, listJarEntries } from '../jarfile';
+import { parseJarfileUri, listJarEntries, listTlaModulesInJar } from '../jarfile';
 
 let tempDir: string;
 let testJarPath: string;
@@ -96,6 +96,26 @@ describe('jarfile utilities', () => {
     it('handles directory path with trailing slash', () => {
       const entries = listJarEntries(testJarPath, 'StandardModules/');
       expect(entries.sort()).toEqual(['Naturals.tla', 'Sequences.tla', '_TETrace.tla', 'README.md'].sort());
+    });
+  });
+
+  describe('listTlaModulesInJar', () => {
+    it('lists only .tla files, excluding _ prefixed modules', () => {
+      const modules = listTlaModulesInJar(testJarPath, 'StandardModules');
+      expect(modules.sort()).toEqual(['Naturals.tla', 'Sequences.tla'].sort());
+      expect(modules).not.toContain('_TETrace.tla');
+      expect(modules).not.toContain('README.md');
+    });
+
+    it('returns full jarfile URIs when returnFullUri is true', () => {
+      const modules = listTlaModulesInJar(testJarPath, 'StandardModules', true);
+      expect(modules).toContain(`jarfile:${testJarPath}!/StandardModules/Naturals.tla`);
+      expect(modules).toContain(`jarfile:${testJarPath}!/StandardModules/Sequences.tla`);
+    });
+
+    it('returns full jarfile URIs for root directory', () => {
+      const modules = listTlaModulesInJar(testJarPath, '', true);
+      expect(modules).toContain(`jarfile:${testJarPath}!/RootModule.tla`);
     });
   });
 });

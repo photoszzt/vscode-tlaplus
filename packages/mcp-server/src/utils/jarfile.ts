@@ -82,3 +82,31 @@ export function listJarEntries(jarPath: string, innerDir: string): string[] {
 
   return results;
 }
+
+export function listTlaModulesInJar(
+  jarPath: string,
+  innerDir: string,
+  returnFullUri: boolean = false
+): string[] {
+  const entries = listJarEntries(jarPath, innerDir);
+
+  const tlaModules = entries.filter((name) => {
+    if (!name.endsWith('.tla')) return false;
+    if (name.startsWith('_')) return false;
+    return true;
+  });
+
+  if (!returnFullUri) {
+    return tlaModules;
+  }
+
+  let normalizedDir = innerDir.replace(/\\/g, '/');
+  if (normalizedDir.endsWith('/')) {
+    normalizedDir = normalizedDir.slice(0, -1);
+  }
+
+  return tlaModules.map((name) => {
+    const innerPath = normalizedDir ? `${normalizedDir}/${name}` : name;
+    return `jarfile:${jarPath}!/${innerPath}`;
+  });
+}
