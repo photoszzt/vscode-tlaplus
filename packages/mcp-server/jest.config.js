@@ -6,7 +6,9 @@ module.exports = {
   collectCoverageFrom: [
     'src/utils/paths.ts',
     'src/utils/java.ts',
-    'src/utils/sany.ts'
+    'src/utils/sany.ts',
+    'src/tools/*.ts',
+    'src/server.ts'
   ],
   coverageThreshold: {
     global: {
