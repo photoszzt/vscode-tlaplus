@@ -38,13 +38,14 @@ Currently, `tlaplus_mcp_sany_modules` only scans filesystem directories. Standar
 4. Update `tlaplus_mcp_sany_modules` tool
 
 ### 3. Unit Test Suite
-**Status:** Implemented (utilities + integration); tools/server coverage pending
-**Effort:** Medium
-**Impact:** High
+**Status:** ✅ Implemented (10 suites, 151 tests); tools/server coverage pending
+**Effort:** Low (remaining work)
+**Impact:** Medium
 
-Automated Jest tests are now in place for the cross-platform utility layer:
+Automated Jest tests are now in place for utilities and symbol extraction:
 
 - Unit tests cover `src/utils/{paths,java,sany}.ts`
+- Symbol extraction tests cover XML parsing, grouping, best-guess heuristics
 - Integration tests cover key utility workflows
 - Java execution is mocked for unit tests
 - Coverage thresholds enforced (scoped to core utility files)

@@ -3,7 +3,7 @@
 **Project:** Standalone MCP Server for TLA+ Tools
 **Status:** ✅ Complete (Not Published)
 **Date Completed:** 2026-01-21
-**Last Updated:** 2026-01-22 (Jest automated tests + CI matrix added; real-world validation pending)
+**Last Updated:** 2026-01-22 (Symbol extraction implemented; 151 tests passing)
 
 ## Overview
 
@@ -33,7 +33,7 @@ Successfully implemented a fully functional Model Context Protocol (MCP) server 
 
 ### ✅ Phase 4: SANY Tools Implementation
 - Implemented tlaplus_mcp_sany_parse tool (fully functional)
-- Created tlaplus_mcp_sany_symbol tool (placeholder for future)
+- Implemented tlaplus_mcp_sany_symbol tool (fully functional with XMLExporter)
 - Built tlaplus_mcp_sany_modules tool (filesystem scanning)
 - Integrated all tools with MCP server
 
@@ -82,6 +82,15 @@ packages/mcp-server/
 │       │   ├── java.test.ts
 │       │   ├── sany.test.ts
 │       │   └── integration.test.ts
+│       ├── symbols/            # Symbol extraction subsystem
+│       │   ├── __tests__/      # Symbol extraction tests
+│       │   ├── best-guess.ts   # Init/Next/Spec heuristics
+│       │   ├── extract.ts      # Main extraction entry
+│       │   ├── grouping.ts     # Symbol categorization
+│       │   ├── types.ts        # Type definitions
+│       │   ├── xml-exporter.ts # Run XMLExporter
+│       │   ├── xml-parser.ts   # Parse XML output
+│       │   └── index.ts        # Public API
 │       ├── java.ts             # Java process execution
 │       ├── logging.ts          # Logging utilities
 │       ├── markdown.ts         # Markdown parsing
@@ -104,7 +113,7 @@ packages/mcp-server/
 ### MCP Tools (6)
 
 1. **tlaplus_mcp_sany_parse** - Parse TLA+ modules for errors
-2. **tlaplus_mcp_sany_symbol** - Extract symbols (planned for future)
+2. **tlaplus_mcp_sany_symbol** - Extract symbols with TLC config suggestions (fully implemented)
 3. **tlaplus_mcp_sany_modules** - List available modules
 4. **tlaplus_mcp_tlc_check** - Exhaustive model checking
 5. **tlaplus_mcp_tlc_smoke** - Quick smoke testing
@@ -137,9 +146,10 @@ All TLA+ knowledge base articles registered as resources:
 ## Test Results
 
 ### Jest Automated Tests
-- ✅ 4 test suites, 88 tests passing
+- ✅ 10 test suites, 151 tests passing
 - ✅ Coverage thresholds enforced (scoped to core utility files)
 - ✅ Integration tests for the utility stack
+- ✅ Symbol extraction tests (XML parsing, grouping, best-guess)
 
 ### Automated Spec Tests (fixtures)
 - ✅ 10 TLA+ specifications tested
@@ -197,10 +207,9 @@ All TLA+ knowledge base articles registered as resources:
 ## Known Limitations
 
 ### Planned for Future
-1. **Symbol Extraction** - Requires XML parsing of SANY output
-2. **JAR Module Scanning** - Currently only scans filesystem directories
-3. **PlusCal Transpilation** - Not yet integrated (SANY only)
-4. **State Space Statistics** - TLC statistics not yet parsed
+1. **JAR Module Scanning** - Currently only scans filesystem directories
+2. **PlusCal Transpilation** - Not yet integrated (SANY only)
+3. **State Space Statistics** - TLC statistics not yet parsed
 
 ### Intentional Exclusions
 1. **VSCode Integration** - Designed to be standalone
@@ -227,10 +236,8 @@ All TLA+ knowledge base articles registered as resources:
 ## Future Improvements
 
 ### High Priority
-1. **Symbol Extraction** - Complete implementation using XMLExporter
-2. **JAR Module Support** - Scan standard modules inside JAR files
-3. **Unit Tests** - ✅ Implemented for core utilities (tools/server coverage still future)
-4. **CI/CD** - ✅ CI matrix added; real-world validation pending
+1. **JAR Module Support** - Scan standard modules inside JAR files
+2. **Tools/Server Tests** - Add tests for `src/tools/*` and `src/server.ts`
 
 ### Medium Priority
 1. **TLC Statistics** - Parse and expose model checking statistics
@@ -241,8 +248,7 @@ All TLA+ knowledge base articles registered as resources:
 ### Low Priority
 1. **Docker Image** - Containerized distribution
 2. **npm Publishing** - Publish to npm registry when ready
-3. **Windows Testing** - CI matrix added; real-world validation pending
-4. **Performance Optimization** - Profile and optimize hot paths
+3. **Performance Optimization** - Profile and optimize hot paths
 
 ## Usage Example
 
