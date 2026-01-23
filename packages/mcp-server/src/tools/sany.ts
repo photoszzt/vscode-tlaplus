@@ -6,6 +6,8 @@ import { ServerConfig } from '../types';
 import { resolveAndValidatePath } from '../utils/paths';
 import { runSanyParse, parseSanyOutput } from '../utils/sany';
 import { extractSymbols } from '../utils/symbols';
+import { isJarfileUri, parseJarfileUri, listTlaModulesInJar } from '../utils/jarfile';
+import { getModuleSearchPaths } from '../utils/tla-tools';
 
 /**
  * Register all SANY tools with the MCP server
@@ -146,7 +148,6 @@ export async function registerSanyTools(
     {},
     async () => {
       try {
-        // Ensure tools directory is configured
         if (!config.toolsDir) {
           return {
             content: [{
@@ -156,32 +157,52 @@ export async function registerSanyTools(
           };
         }
 
-        const modulesBySearchPath: { [searchPath: string]: string[] } = {};
+        const searchPaths = getModuleSearchPaths(config.toolsDir);
+        const results: string[] = [];
+        const errors: string[] = [];
 
-        // Check standard modules in tools directory
-        // For now, we'll just scan filesystem paths (JAR support can be added later)
-        const standardModulesPath = path.join(config.toolsDir, 'StandardModules');
+        for (const searchPath of searchPaths) {
+          if (isJarfileUri(searchPath)) {
+            try {
+              const { jarPath, innerPath } = parseJarfileUri(searchPath);
+              const modules = listTlaModulesInJar(jarPath, innerPath, true);
+              results.push(...modules);
+            } catch (err) {
+              errors.push(`Warning: Failed to scan ${searchPath}: ${err instanceof Error ? err.message : String(err)}`);
+            }
+          } else {
+            if (!fs.existsSync(searchPath)) {
+              continue;
+            }
 
-        if (fs.existsSync(standardModulesPath)) {
-          const files = await fs.promises.readdir(standardModulesPath);
-          const tlaFiles = files.filter(file => file.endsWith('.tla'));
-
-          if (tlaFiles.length > 0) {
-            modulesBySearchPath[standardModulesPath] = [];
-            for (const file of tlaFiles) {
-              const moduleName = path.basename(file, '.tla');
-              // Skip modules whose name starts with '_'
-              if (!moduleName.startsWith('_')) {
-                modulesBySearchPath[standardModulesPath].push(
-                  `${standardModulesPath}${path.sep}${file}`
-                );
+            try {
+              const entries = await fs.promises.readdir(searchPath);
+              for (const entry of entries) {
+                if (!entry.endsWith('.tla')) continue;
+                if (entry.startsWith('_')) continue;
+                results.push(path.join(searchPath, entry));
               }
+            } catch (err) {
+              errors.push(`Warning: Failed to read ${searchPath}: ${err instanceof Error ? err.message : String(err)}`);
             }
           }
         }
 
-        // Format the output
-        if (Object.keys(modulesBySearchPath).length === 0) {
+        const legacyPath = path.join(config.toolsDir, 'StandardModules');
+        if (fs.existsSync(legacyPath) && !searchPaths.includes(legacyPath)) {
+          try {
+            const entries = await fs.promises.readdir(legacyPath);
+            for (const entry of entries) {
+              if (!entry.endsWith('.tla')) continue;
+              if (entry.startsWith('_')) continue;
+              results.push(path.join(legacyPath, entry));
+            }
+          } catch {
+            // Ignore errors on legacy path
+          }
+        }
+
+        if (results.length === 0 && errors.length === 0) {
           return {
             content: [{
               type: 'text',
@@ -191,19 +212,13 @@ export async function registerSanyTools(
           };
         }
 
-        const lines: string[] = [];
-        for (const [searchPath, modules] of Object.entries(modulesBySearchPath)) {
-          lines.push(`\n${searchPath}:`);
-          for (const module of modules) {
-            lines.push(`  - ${path.basename(module)}`);
-          }
+        let output = results.join('\n');
+        if (errors.length > 0) {
+          output += '\n\n' + errors.join('\n');
         }
 
         return {
-          content: [{
-            type: 'text',
-            text: `Available TLA+ modules:${lines.join('\n')}`
-          }]
+          content: [{ type: 'text', text: output }]
         };
       } catch (error) {
         return {

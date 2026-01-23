@@ -8,6 +8,8 @@ import { MINIMAL_CONFIG, NO_TOOLS_CONFIG } from '../../__tests__/fixtures/config
 jest.mock('../../utils/paths');
 jest.mock('../../utils/sany');
 jest.mock('../../utils/symbols');
+jest.mock('../../utils/jarfile');
+jest.mock('../../utils/tla-tools');
 jest.mock('fs', () => ({
   existsSync: jest.fn(),
   promises: {
@@ -19,6 +21,8 @@ jest.mock('fs', () => ({
 import { resolveAndValidatePath } from '../../utils/paths';
 import { runSanyParse, parseSanyOutput } from '../../utils/sany';
 import { extractSymbols } from '../../utils/symbols';
+import * as jarfile from '../../utils/jarfile';
+import * as tlaTools from '../../utils/tla-tools';
 import * as fs from 'fs';
 
 describe('SANY Tools', () => {
@@ -28,6 +32,8 @@ describe('SANY Tools', () => {
     jest.clearAllMocks();
     mockServer = createMockMcpServer();
     (resolveAndValidatePath as jest.Mock).mockImplementation((path) => path);
+    (tlaTools.getModuleSearchPaths as jest.Mock).mockReturnValue([]);
+    (jarfile.isJarfileUri as jest.Mock).mockImplementation((p: string) => p.startsWith('jarfile:'));
   });
 
   describe('Tool Registration', () => {
@@ -275,13 +281,10 @@ describe('SANY Tools', () => {
 
       const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_modules', {});
 
-      expectMcpTextResponse(response, 'Available TLA+ modules');
       expectMcpTextResponse(response, 'Naturals.tla');
       expectMcpTextResponse(response, 'Sequences.tla');
       expectMcpTextResponse(response, 'FiniteSets.tla');
-      // Should not include files starting with _
       expect(response.content[0].text).not.toContain('_Internal.tla');
-      // Should not include non-.tla files
       expect(response.content[0].text).not.toContain('readme.txt');
     });
 
@@ -312,13 +315,64 @@ describe('SANY Tools', () => {
     });
 
     it('handles readdir errors gracefully', async () => {
+      const standardModulesPath = '/mock/tools/StandardModules';
+      (tlaTools.getModuleSearchPaths as jest.Mock).mockReturnValue([standardModulesPath]);
       (fs.existsSync as jest.Mock).mockReturnValue(true);
       (fs.promises.readdir as jest.Mock).mockRejectedValue(new Error('Permission denied'));
 
       const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_modules', {});
 
-      expectMcpErrorResponse(response, 'Failed to list modules');
+      expectMcpErrorResponse(response, 'Warning: Failed to read');
       expectMcpErrorResponse(response, 'Permission denied');
+    });
+
+    describe('JAR scanning', () => {
+      beforeEach(() => {
+        (jarfile.isJarfileUri as jest.Mock).mockImplementation((p: string) => p.startsWith('jarfile:'));
+        (jarfile.parseJarfileUri as jest.Mock).mockImplementation((uri: string) => {
+          const withoutScheme = uri.slice('jarfile:'.length);
+          const sepIdx = withoutScheme.indexOf('!');
+          return {
+            jarPath: withoutScheme.slice(0, sepIdx),
+            innerPath: withoutScheme.slice(sepIdx + 2),
+          };
+        });
+      });
+
+      it('lists modules from JAR roots returned by getModuleSearchPaths', async () => {
+        (fs.existsSync as jest.Mock).mockReturnValue(false);
+        (tlaTools.getModuleSearchPaths as jest.Mock).mockReturnValue([
+          'jarfile:/tools/tla2tools.jar!/tla2sany/StandardModules',
+        ]);
+        (jarfile.listTlaModulesInJar as jest.Mock).mockReturnValue([
+          'jarfile:/tools/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla',
+          'jarfile:/tools/tla2tools.jar!/tla2sany/StandardModules/Sequences.tla',
+        ]);
+
+        const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_modules', {});
+
+        expect(response.content[0].text).toContain('Naturals.tla');
+        expect(response.content[0].text).toContain('Sequences.tla');
+        expect(response.content[0].text).toContain('jarfile:');
+      });
+
+      it('combines filesystem and JAR modules', async () => {
+        (fs.existsSync as jest.Mock).mockReturnValue(true);
+        (fs.promises.readdir as jest.Mock).mockResolvedValue([
+          'LocalModule.tla',
+        ]);
+        (tlaTools.getModuleSearchPaths as jest.Mock).mockReturnValue([
+          'jarfile:/tools/tla2tools.jar!/tla2sany/StandardModules',
+        ]);
+        (jarfile.listTlaModulesInJar as jest.Mock).mockReturnValue([
+          'jarfile:/tools/tla2tools.jar!/tla2sany/StandardModules/Naturals.tla',
+        ]);
+
+        const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_modules', {});
+
+        expect(response.content[0].text).toContain('LocalModule.tla');
+        expect(response.content[0].text).toContain('Naturals.tla');
+      });
     });
   });
 });
