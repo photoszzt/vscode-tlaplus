@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import AdmZip from 'adm-zip';
-import { parseJarfileUri, listJarEntries, listTlaModulesInJar } from '../jarfile';
+import { parseJarfileUri, listJarEntries, listTlaModulesInJar, extractJarEntry, extractJarDirectory, clearJarCache } from '../jarfile';
 
 let tempDir: string;
 let testJarPath: string;
@@ -116,6 +116,53 @@ describe('jarfile utilities', () => {
     it('returns full jarfile URIs for root directory', () => {
       const modules = listTlaModulesInJar(testJarPath, '', true);
       expect(modules).toContain(`jarfile:${testJarPath}!/RootModule.tla`);
+    });
+  });
+
+  describe('extractJarEntry', () => {
+    beforeEach(() => {
+      clearJarCache();
+    });
+
+    it('extracts a single file to cache and returns path', () => {
+      const extractedPath = extractJarEntry(testJarPath, 'StandardModules/Naturals.tla');
+      expect(fs.existsSync(extractedPath)).toBe(true);
+      expect(extractedPath.endsWith('Naturals.tla')).toBe(true);
+      const content = fs.readFileSync(extractedPath, 'utf-8');
+      expect(content).toContain('MODULE Naturals');
+    });
+
+    it('returns same path on repeated calls (caching)', () => {
+      const path1 = extractJarEntry(testJarPath, 'StandardModules/Naturals.tla');
+      const path2 = extractJarEntry(testJarPath, 'StandardModules/Naturals.tla');
+      expect(path1).toBe(path2);
+    });
+
+    it('throws for non-existent entry', () => {
+      expect(() => extractJarEntry(testJarPath, 'nonexistent.tla')).toThrow('not found in JAR');
+    });
+
+    it('rejects path traversal attempts', () => {
+      expect(() => extractJarEntry(testJarPath, '../etc/passwd')).toThrow('path traversal');
+    });
+  });
+
+  describe('extractJarDirectory', () => {
+    beforeEach(() => {
+      clearJarCache();
+    });
+
+    it('extracts entire directory and returns cache path', () => {
+      const extractedDir = extractJarDirectory(testJarPath, 'StandardModules');
+      expect(fs.existsSync(extractedDir)).toBe(true);
+      expect(fs.existsSync(path.join(extractedDir, 'Naturals.tla'))).toBe(true);
+      expect(fs.existsSync(path.join(extractedDir, 'Sequences.tla'))).toBe(true);
+    });
+
+    it('returns same path on repeated calls (caching)', () => {
+      const dir1 = extractJarDirectory(testJarPath, 'StandardModules');
+      const dir2 = extractJarDirectory(testJarPath, 'StandardModules');
+      expect(dir1).toBe(dir2);
     });
   });
 });

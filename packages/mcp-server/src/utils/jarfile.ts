@@ -1,3 +1,9 @@
+import AdmZip from 'adm-zip';
+import * as fs from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import * as crypto from 'crypto';
+
 /**
  * Utilities for reading TLA+ modules from JAR files.
  * JAR files are ZIP archives; we use adm-zip for reading.
@@ -46,11 +52,9 @@ export function parseJarfileUri(uri: string): ParsedJarfileUri {
 /**
  * Check if a string is a jarfile: URI.
  */
-export function isJarfileUri(path: string): boolean {
-  return path.startsWith('jarfile:');
+export function isJarfileUri(uriPath: string): boolean {
+  return uriPath.startsWith('jarfile:');
 }
-
-import AdmZip from 'adm-zip';
 
 export function listJarEntries(jarPath: string, innerDir: string): string[] {
   const zip = new AdmZip(jarPath);
@@ -109,4 +113,107 @@ export function listTlaModulesInJar(
     const innerPath = normalizedDir ? `${normalizedDir}/${name}` : name;
     return `jarfile:${jarPath}!/${innerPath}`;
   });
+}
+
+const extractionCache = new Map<string, string>();
+
+function getCacheDir(): string {
+  const cacheBase = path.join(os.tmpdir(), 'tlaplus-mcp', 'jar-cache');
+  if (!fs.existsSync(cacheBase)) {
+    fs.mkdirSync(cacheBase, { recursive: true });
+  }
+  return cacheBase;
+}
+
+function getCacheKey(jarPath: string, innerPath: string): string {
+  const stats = fs.statSync(jarPath);
+  const data = `${jarPath}:${stats.mtimeMs}:${innerPath}`;
+  return crypto.createHash('sha256').update(data).digest('hex').slice(0, 16);
+}
+
+export function clearJarCache(): void {
+  extractionCache.clear();
+}
+
+export function extractJarEntry(jarPath: string, innerPath: string): string {
+  if (innerPath.includes('..') || path.isAbsolute(innerPath)) {
+    throw new Error(`Invalid inner path (path traversal rejected): ${innerPath}`);
+  }
+
+  const cacheKey = getCacheKey(jarPath, innerPath);
+
+  const cached = extractionCache.get(cacheKey);
+  if (cached && fs.existsSync(cached)) {
+    return cached;
+  }
+
+  const zip = new AdmZip(jarPath);
+  const entry = zip.getEntry(innerPath) || zip.getEntry(innerPath.replace(/\//g, '\\'));
+
+  if (!entry) {
+    throw new Error(`Entry '${innerPath}' not found in JAR: ${jarPath}`);
+  }
+
+  const cacheDir = getCacheDir();
+  const extractDir = path.join(cacheDir, cacheKey);
+  if (!fs.existsSync(extractDir)) {
+    fs.mkdirSync(extractDir, { recursive: true });
+  }
+
+  const targetPath = path.join(extractDir, path.basename(innerPath));
+  fs.writeFileSync(targetPath, entry.getData());
+
+  extractionCache.set(cacheKey, targetPath);
+  return targetPath;
+}
+
+export function extractJarDirectory(jarPath: string, innerDir: string): string {
+  if (innerDir.includes('..') || (innerDir && path.isAbsolute(innerDir))) {
+    throw new Error(`Invalid inner path (path traversal rejected): ${innerDir}`);
+  }
+
+  const cacheKey = getCacheKey(jarPath, `dir:${innerDir}`);
+
+  const cached = extractionCache.get(cacheKey);
+  if (cached && fs.existsSync(cached)) {
+    return cached;
+  }
+
+  const zip = new AdmZip(jarPath);
+  const entries = zip.getEntries();
+
+  let normalizedDir = innerDir.replace(/\\/g, '/');
+  if (normalizedDir.endsWith('/')) {
+    normalizedDir = normalizedDir.slice(0, -1);
+  }
+  const prefix = normalizedDir ? normalizedDir + '/' : '';
+
+  const cacheDir = getCacheDir();
+  const extractDir = path.join(cacheDir, cacheKey);
+  if (!fs.existsSync(extractDir)) {
+    fs.mkdirSync(extractDir, { recursive: true });
+  }
+
+  for (const entry of entries) {
+    if (entry.isDirectory) continue;
+
+    const entryPath = entry.entryName.replace(/\\/g, '/');
+    if (prefix && !entryPath.startsWith(prefix)) continue;
+
+    const relativePath = prefix ? entryPath.slice(prefix.length) : entryPath;
+
+    if (relativePath.includes('..')) continue;
+
+    const targetPath = path.join(extractDir, relativePath);
+    const targetDir = path.dirname(targetPath);
+
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+
+    fs.writeFileSync(targetPath, entry.getData());
+  }
+
+  extractionCache.set(cacheKey, extractDir);
+  return extractDir;
 }
