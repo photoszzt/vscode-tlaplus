@@ -189,4 +189,174 @@ describe('TLC Tools', () => {
       expectMcpErrorResponse(response, 'Java heap space');
     });
   });
+
+  describe('tlaplus_mcp_tlc_smoke', () => {
+    beforeEach(async () => {
+      await registerTlcTools(mockServer, MINIMAL_CONFIG);
+    });
+
+    it('runs smoke test with simulation mode', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      const mocks = mockTlcSuccess(['TLC2 Version 2.18', 'Running Random Simulation...', 'Generated 100 states'], 0);
+      (getSpecFiles as jest.Mock).mockImplementation(mocks.getSpecFiles);
+      (runTlcAndWait as jest.Mock).mockImplementation(mocks.runTlcAndWait);
+
+      const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_tlc_smoke', {
+        fileName: '/mock/spec.tla'
+      });
+
+      expectMcpTextResponse(response, 'Smoke test completed');
+      expectMcpTextResponse(response, 'Random Simulation');
+
+      expect(runTlcAndWait).toHaveBeenCalledWith(
+        '/mock/spec.tla',
+        'spec.cfg',
+        ['-cleanup', '-simulate'],
+        ['-Dtlc2.TLC.stopAfter=3'],
+        MINIMAL_CONFIG.toolsDir,
+        undefined
+      );
+    });
+
+    it('includes stopAfter Java option by default', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      const mocks = mockTlcSuccess([], 0);
+      (getSpecFiles as jest.Mock).mockImplementation(mocks.getSpecFiles);
+      (runTlcAndWait as jest.Mock).mockImplementation(mocks.runTlcAndWait);
+
+      await callRegisteredTool(mockServer, 'tlaplus_mcp_tlc_smoke', {
+        fileName: '/mock/spec.tla'
+      });
+
+      expect(runTlcAndWait).toHaveBeenCalledWith(
+        '/mock/spec.tla',
+        'spec.cfg',
+        ['-cleanup', '-simulate'],
+        ['-Dtlc2.TLC.stopAfter=3'],
+        MINIMAL_CONFIG.toolsDir,
+        undefined
+      );
+    });
+
+    it('merges extraJavaOpts with stopAfter', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      const mocks = mockTlcSuccess([], 0);
+      (getSpecFiles as jest.Mock).mockImplementation(mocks.getSpecFiles);
+      (runTlcAndWait as jest.Mock).mockImplementation(mocks.runTlcAndWait);
+
+      await callRegisteredTool(mockServer, 'tlaplus_mcp_tlc_smoke', {
+        fileName: '/mock/spec.tla',
+        extraJavaOpts: ['-Xmx2G']
+      });
+
+      expect(runTlcAndWait).toHaveBeenCalledWith(
+        '/mock/spec.tla',
+        'spec.cfg',
+        ['-cleanup', '-simulate'],
+        ['-Dtlc2.TLC.stopAfter=3', '-Xmx2G'],
+        MINIMAL_CONFIG.toolsDir,
+        undefined
+      );
+    });
+
+    it('returns error when no config found', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      const mocks = mockTlcNoConfig();
+      (getSpecFiles as jest.Mock).mockImplementation(mocks.getSpecFiles);
+
+      const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_tlc_smoke', {
+        fileName: '/mock/spec.tla'
+      });
+
+      expectMcpErrorResponse(response, 'No spec.cfg or MCspec.tla/MCspec.cfg files found');
+    });
+  });
+
+  describe('tlaplus_mcp_tlc_explore', () => {
+    beforeEach(async () => {
+      await registerTlcTools(mockServer, MINIMAL_CONFIG);
+    });
+
+    it('explores behaviors with specified length', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      const mocks = mockTlcSuccess(['State 1:', '/\\ x = 0', 'State 2:', '/\\ x = 1'], 0);
+      (getSpecFiles as jest.Mock).mockImplementation(mocks.getSpecFiles);
+      (runTlcAndWait as jest.Mock).mockImplementation(mocks.runTlcAndWait);
+
+      const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_tlc_explore', {
+        fileName: '/mock/spec.tla',
+        behaviorLength: 5
+      });
+
+      expectMcpTextResponse(response, 'Behavior exploration completed');
+      expectMcpTextResponse(response, 'State 1');
+
+      expect(runTlcAndWait).toHaveBeenCalledWith(
+        '/mock/spec.tla',
+        'spec.cfg',
+        ['-cleanup', '-simulate', '-invlevel', '5'],
+        ['-Dtlc2.TLC.stopAfter=3'],
+        MINIMAL_CONFIG.toolsDir,
+        undefined
+      );
+    });
+
+    it('passes behaviorLength as string to -invlevel', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      const mocks = mockTlcSuccess([], 0);
+      (getSpecFiles as jest.Mock).mockImplementation(mocks.getSpecFiles);
+      (runTlcAndWait as jest.Mock).mockImplementation(mocks.runTlcAndWait);
+
+      await callRegisteredTool(mockServer, 'tlaplus_mcp_tlc_explore', {
+        fileName: '/mock/spec.tla',
+        behaviorLength: 10
+      });
+
+      expect(runTlcAndWait).toHaveBeenCalledWith(
+        '/mock/spec.tla',
+        'spec.cfg',
+        ['-cleanup', '-simulate', '-invlevel', '10'],
+        ['-Dtlc2.TLC.stopAfter=3'],
+        MINIMAL_CONFIG.toolsDir,
+        undefined
+      );
+    });
+
+    it('supports custom config file', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      const mocks = mockTlcSuccess([], 0);
+      (getSpecFiles as jest.Mock).mockImplementation(mocks.getSpecFiles);
+      (runTlcAndWait as jest.Mock).mockImplementation(mocks.runTlcAndWait);
+
+      await callRegisteredTool(mockServer, 'tlaplus_mcp_tlc_explore', {
+        fileName: '/mock/spec.tla',
+        behaviorLength: 5,
+        cfgFile: '/mock/custom.cfg'
+      });
+
+      expect(runTlcAndWait).toHaveBeenCalledWith(
+        '/mock/spec.tla',
+        'custom.cfg',
+        ['-cleanup', '-simulate', '-invlevel', '5'],
+        ['-Dtlc2.TLC.stopAfter=3'],
+        MINIMAL_CONFIG.toolsDir,
+        undefined
+      );
+    });
+
+    it('handles exploration errors', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      const mocks = mockTlcError('Invalid configuration');
+      (getSpecFiles as jest.Mock).mockImplementation(mocks.getSpecFiles);
+      (runTlcAndWait as jest.Mock).mockImplementation(mocks.runTlcAndWait);
+
+      const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_tlc_explore', {
+        fileName: '/mock/spec.tla',
+        behaviorLength: 5
+      });
+
+      expectMcpErrorResponse(response, 'Error exploring TLC behaviors');
+      expectMcpErrorResponse(response, 'Invalid configuration');
+    });
+  });
 });
