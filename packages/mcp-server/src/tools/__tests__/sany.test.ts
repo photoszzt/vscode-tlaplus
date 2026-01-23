@@ -8,7 +8,13 @@ import { MINIMAL_CONFIG, NO_TOOLS_CONFIG } from '../../__tests__/fixtures/config
 jest.mock('../../utils/paths');
 jest.mock('../../utils/sany');
 jest.mock('../../utils/symbols');
-jest.mock('fs');
+jest.mock('fs', () => ({
+  existsSync: jest.fn(),
+  promises: {
+    readdir: jest.fn(),
+    readFile: jest.fn()
+  }
+}));
 
 import { resolveAndValidatePath } from '../../utils/paths';
 import { runSanyParse, parseSanyOutput } from '../../utils/sany';
@@ -249,6 +255,70 @@ describe('SANY Tools', () => {
         false,
         '/custom/java'
       );
+    });
+  });
+
+  describe('tlaplus_mcp_sany_modules', () => {
+    beforeEach(async () => {
+      await registerSanyTools(mockServer, MINIMAL_CONFIG);
+    });
+
+    it('lists modules from StandardModules directory', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.promises.readdir as jest.Mock).mockResolvedValue([
+        'Naturals.tla',
+        'Sequences.tla',
+        'FiniteSets.tla',
+        '_Internal.tla',
+        'readme.txt'
+      ]);
+
+      const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_modules', {});
+
+      expectMcpTextResponse(response, 'Available TLA+ modules');
+      expectMcpTextResponse(response, 'Naturals.tla');
+      expectMcpTextResponse(response, 'Sequences.tla');
+      expectMcpTextResponse(response, 'FiniteSets.tla');
+      // Should not include files starting with _
+      expect(response.content[0].text).not.toContain('_Internal.tla');
+      // Should not include non-.tla files
+      expect(response.content[0].text).not.toContain('readme.txt');
+    });
+
+    it('handles empty StandardModules directory', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.promises.readdir as jest.Mock).mockResolvedValue([]);
+
+      const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_modules', {});
+
+      expectMcpErrorResponse(response, 'No TLA+ modules found');
+      expectMcpErrorResponse(response, 'JAR file support');
+    });
+
+    it('handles missing StandardModules directory', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(false);
+
+      const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_modules', {});
+
+      expectMcpErrorResponse(response, 'No TLA+ modules found');
+    });
+
+    it('returns error when tools directory not configured', async () => {
+      await registerSanyTools(mockServer, NO_TOOLS_CONFIG);
+
+      const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_modules', {});
+
+      expectMcpErrorResponse(response, 'tools directory not configured');
+    });
+
+    it('handles readdir errors gracefully', async () => {
+      (fs.existsSync as jest.Mock).mockReturnValue(true);
+      (fs.promises.readdir as jest.Mock).mockRejectedValue(new Error('Permission denied'));
+
+      const response = await callRegisteredTool(mockServer, 'tlaplus_mcp_sany_modules', {});
+
+      expectMcpErrorResponse(response, 'Failed to list modules');
+      expectMcpErrorResponse(response, 'Permission denied');
     });
   });
 });
