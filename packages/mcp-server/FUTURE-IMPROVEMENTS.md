@@ -38,21 +38,31 @@ Currently, `tlaplus_mcp_sany_modules` only scans filesystem directories. Standar
 4. Update `tlaplus_mcp_sany_modules` tool
 
 ### 3. Unit Test Suite
-**Status:** ✅ Implemented (10 suites, 151 tests); tools/server coverage pending
-**Effort:** Low (remaining work)
-**Impact:** Medium
+**Status:** ✅ Implemented (14 suites, 223 tests)
+**Effort:** Complete
+**Impact:** High
 
-Automated Jest tests are now in place for utilities and symbol extraction:
+Comprehensive automated Jest tests are now in place:
 
+**Utilities & Symbol Extraction:**
 - Unit tests cover `src/utils/{paths,java,sany}.ts`
 - Symbol extraction tests cover XML parsing, grouping, best-guess heuristics
 - Integration tests cover key utility workflows
 - Java execution is mocked for unit tests
-- Coverage thresholds enforced (scoped to core utility files)
 
-Remaining work (optional):
-- Add tests for `src/tools/*` and `src/server.ts`
-- Add MCP protocol compliance tests (tool registration, schemas, error mapping)
+**Tool Handlers:**
+- `src/tools/sany.ts` - 19 tests (parse, symbol extraction, module listing)
+- `src/tools/tlc.ts` - 18 tests (model checking, smoke tests, behavior exploration)
+- `src/tools/knowledge.ts` - 10 tests (resource registration, frontmatter parsing)
+
+**Server Lifecycle:**
+- `src/server.ts` - 25 tests (initialization, stdio mode, HTTP mode, MCP protocol compliance)
+
+**Test Infrastructure:**
+- Fixtures for sample TLA+ modules, TLC outputs, configs, markdown
+- Helpers for mock MCP server, assertions, utility mocks
+- Coverage tracking expanded to tools and server
+- Coverage thresholds met: 95.31% statements, 88.7% branches, 87.5% functions, 95.45% lines
 
 ## Medium Priority
 
@@ -262,4 +272,4 @@ Features are prioritized based on:
 
 ---
 
-Last updated: 2026-01-22
+Last updated: 2026-01-23
