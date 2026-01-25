@@ -2,6 +2,11 @@
 import { ErrorCode, ERROR_RETRYABLE } from './error-codes';
 
 export function classifyError(error: Error): ErrorCode {
+  // If already enhanced (has code property), return it
+  if ('code' in error && typeof (error as any).code === 'string' && (error as any).code in ErrorCode) {
+    return (error as any).code as ErrorCode;
+  }
+
   const message = error.message.toLowerCase();
   const errno = (error as NodeJS.ErrnoException).code;
 
