@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { PassThrough } from 'stream';
 import { JavaOptions } from '../types';
+import { withRetry, ErrorCode, classifyError, enhanceError } from './errors';
 
 const javaCmd = 'java' + (process.platform === 'win32' ? '.exe' : '');
 const DEFAULT_GC_OPTION = '-XX:+UseParallelGC';
@@ -80,7 +81,9 @@ export async function runJavaCommand(
   // Build complete command: java [opts] [mainClass] [args]
   const fullArgs = opts.concat([mainClass]).concat(args);
 
-  return await new Promise<ProcessInfo>((resolve, reject) => {
+  // Wrap spawn in retry logic for transient failures
+  return await withRetry(
+    async () => new Promise<ProcessInfo>((resolve, reject) => {
     const spawnOptions: any = { cwd: workingDir || process.cwd() };
 
     // Enable proper termination on Windows
@@ -145,7 +148,16 @@ export async function runJavaCommand(
 
     const onError = (err: Error) => {
       cleanup();
-      reject(new Error(`Failed to launch Java process using "${javaPath}": ${err.message}`));
+      reject(enhanceError(
+        new Error(`Failed to launch Java process using "${javaPath}": ${err.message}`),
+        {
+          context: {
+            javaPath,
+            mainClass,
+            args: args.slice(0, 3) // Truncate to avoid huge logs
+          }
+        }
+      ));
     };
 
     const onSpawn = () => {
@@ -161,7 +173,18 @@ export async function runJavaCommand(
 
     proc.once('error', onError);
     proc.once('spawn', onSpawn);
-  });
+  }),
+    {
+      maxAttempts: 3,
+      initialDelayMs: 100,
+      maxDelayMs: 10000,
+      backoffMultiplier: 10,
+      shouldRetry: (error) => {
+        const code = classifyError(error);
+        return code === ErrorCode.JAVA_SPAWN_FAILED;
+      }
+    }
+  );
 }
 
 /**

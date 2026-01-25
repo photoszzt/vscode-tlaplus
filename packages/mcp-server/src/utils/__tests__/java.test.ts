@@ -308,18 +308,21 @@ describe('java', () => {
       expect(killSpy).toHaveBeenCalledWith('SIGTERM');
     });
 
-    it('rejects when spawn fails', async () => {
+    it('rejects when spawn fails with retry', async () => {
       mockExistsSync.mockReturnValue(true);
       process.env.JAVA_HOME = '/test/java';
 
-      const mockProc = createMockProcess();
-      mockSpawn.mockReturnValue(mockProc);
+      // Mock spawn to emit error for every attempt
+      mockSpawn.mockImplementation(() => {
+        const mockProc = createMockProcess();
+        setImmediate(() => mockProc.emit('error', new Error('spawn failed')));
+        return mockProc;
+      });
 
       const promise = runJavaCommand('/path/to/tool.jar', 'MainClass', []);
-      setImmediate(() => mockProc.emit('error', new Error('spawn failed')));
 
       await expect(promise).rejects.toThrow('Failed to launch Java process');
-    });
+    }, 20000); // Increase timeout to allow for retries (100ms + 1s + 10s)
 
     it('handles process that already exited before spawn event', async () => {
       mockExistsSync.mockReturnValue(true);
