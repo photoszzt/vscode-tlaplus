@@ -115,8 +115,9 @@ describe('SANY Tools', () => {
         fileName: '/mock/test.tla'
       });
 
-      expectMcpErrorResponse(response, 'Error processing TLA+ specification');
+      expectMcpErrorResponse(response, 'Error [FILE_IO_ERROR]');
       expectMcpErrorResponse(response, 'Java not found');
+      expectMcpErrorResponse(response, 'Suggested Actions:');
     });
 
     describe('jarfile: URI support', () => {
@@ -274,8 +275,9 @@ describe('SANY Tools', () => {
         fileName: '/mock/test.tla'
       });
 
-      expectMcpErrorResponse(response, 'Failed to extract symbols');
+      expectMcpErrorResponse(response, 'Error [FILE_IO_ERROR]');
       expectMcpErrorResponse(response, 'Failed to parse XML');
+      expectMcpErrorResponse(response, 'Suggested Actions:');
     });
 
     describe('jarfile: URI support', () => {
