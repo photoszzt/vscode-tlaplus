@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { withRetrySync, ErrorCode, enhanceError, classifyError } from './errors';
 
 /**
  * Utilities for reading TLA+ modules from JAR files.
@@ -136,6 +137,7 @@ export function clearJarCache(): void {
 }
 
 export function extractJarEntry(jarPath: string, innerPath: string): string {
+  // Validation stays outside retry
   if (innerPath.includes('..') || path.isAbsolute(innerPath)) {
     throw new Error(`Invalid inner path (path traversal rejected): ${innerPath}`);
   }
@@ -147,27 +149,64 @@ export function extractJarEntry(jarPath: string, innerPath: string): string {
     return cached;
   }
 
-  const zip = new AdmZip(jarPath);
-  const entry = zip.getEntry(innerPath) || zip.getEntry(innerPath.replace(/\//g, '\\'));
+  // Wrap extraction in retry
+  return withRetrySync(
+    () => {
+      const zip = new AdmZip(jarPath);
+      const entry = zip.getEntry(innerPath) || zip.getEntry(innerPath.replace(/\//g, '\\'));
 
-  if (!entry) {
-    throw new Error(`Entry '${innerPath}' not found in JAR: ${jarPath}`);
-  }
+      if (!entry) {
+        throw enhanceError(
+          new Error(`Entry '${innerPath}' not found in JAR: ${jarPath}`),
+          { code: ErrorCode.JAR_ENTRY_NOT_FOUND }
+        );
+      }
 
-  const cacheDir = getCacheDir();
-  const extractDir = path.join(cacheDir, cacheKey);
-  if (!fs.existsSync(extractDir)) {
-    fs.mkdirSync(extractDir, { recursive: true });
-  }
+      const cacheDir = getCacheDir();
+      const extractDir = path.join(cacheDir, cacheKey);
 
-  const targetPath = path.join(extractDir, path.basename(innerPath));
-  fs.writeFileSync(targetPath, entry.getData());
+      // Add error handling for directory creation
+      try {
+        if (!fs.existsSync(extractDir)) {
+          fs.mkdirSync(extractDir, { recursive: true });
+        }
+      } catch (err) {
+        throw enhanceError(err as Error, {
+          code: ErrorCode.JAR_EXTRACTION_FAILED,
+          context: { jarPath, innerPath, extractDir }
+        });
+      }
 
-  extractionCache.set(cacheKey, targetPath);
-  return targetPath;
+      const targetPath = path.join(extractDir, path.basename(innerPath));
+
+      // Add error handling for file write
+      try {
+        fs.writeFileSync(targetPath, entry.getData());
+      } catch (err) {
+        throw enhanceError(err as Error, {
+          code: ErrorCode.JAR_EXTRACTION_FAILED,
+          context: { jarPath, innerPath, targetPath }
+        });
+      }
+
+      extractionCache.set(cacheKey, targetPath);
+      return targetPath;
+    },
+    {
+      maxAttempts: 3,
+      initialDelayMs: 100,
+      maxDelayMs: 10000,
+      backoffMultiplier: 10,
+      shouldRetry: (error) => {
+        const code = classifyError(error);
+        return code === ErrorCode.JAR_LOCKED || code === ErrorCode.JAR_EXTRACTION_FAILED;
+      }
+    }
+  );
 }
 
 export function extractJarDirectory(jarPath: string, innerDir: string): string {
+  // Validation stays outside retry
   if (innerDir.includes('..') || (innerDir && path.isAbsolute(innerDir))) {
     throw new Error(`Invalid inner path (path traversal rejected): ${innerDir}`);
   }
@@ -179,43 +218,83 @@ export function extractJarDirectory(jarPath: string, innerDir: string): string {
     return cached;
   }
 
-  const zip = new AdmZip(jarPath);
-  const entries = zip.getEntries();
+  // Wrap extraction in retry
+  return withRetrySync(
+    () => {
+      const zip = new AdmZip(jarPath);
+      const entries = zip.getEntries();
 
-  let normalizedDir = innerDir.replace(/\\/g, '/');
-  if (normalizedDir.endsWith('/')) {
-    normalizedDir = normalizedDir.slice(0, -1);
-  }
-  const prefix = normalizedDir ? normalizedDir + '/' : '';
+      let normalizedDir = innerDir.replace(/\\/g, '/');
+      if (normalizedDir.endsWith('/')) {
+        normalizedDir = normalizedDir.slice(0, -1);
+      }
+      const prefix = normalizedDir ? normalizedDir + '/' : '';
 
-  const cacheDir = getCacheDir();
-  const extractDir = path.join(cacheDir, cacheKey);
-  if (!fs.existsSync(extractDir)) {
-    fs.mkdirSync(extractDir, { recursive: true });
-  }
+      const cacheDir = getCacheDir();
+      const extractDir = path.join(cacheDir, cacheKey);
 
-  for (const entry of entries) {
-    if (entry.isDirectory) continue;
+      // Add error handling for directory creation
+      try {
+        if (!fs.existsSync(extractDir)) {
+          fs.mkdirSync(extractDir, { recursive: true });
+        }
+      } catch (err) {
+        throw enhanceError(err as Error, {
+          code: ErrorCode.JAR_EXTRACTION_FAILED,
+          context: { jarPath, innerDir, extractDir }
+        });
+      }
 
-    const entryPath = entry.entryName.replace(/\\/g, '/');
-    if (prefix && !entryPath.startsWith(prefix)) continue;
+      for (const entry of entries) {
+        if (entry.isDirectory) continue;
 
-    const relativePath = prefix ? entryPath.slice(prefix.length) : entryPath;
+        const entryPath = entry.entryName.replace(/\\/g, '/');
+        if (prefix && !entryPath.startsWith(prefix)) continue;
 
-    if (relativePath.includes('..')) continue;
+        const relativePath = prefix ? entryPath.slice(prefix.length) : entryPath;
 
-    const targetPath = path.join(extractDir, relativePath);
-    const targetDir = path.dirname(targetPath);
+        if (relativePath.includes('..')) continue;
 
-    if (!fs.existsSync(targetDir)) {
-      fs.mkdirSync(targetDir, { recursive: true });
+        const targetPath = path.join(extractDir, relativePath);
+        const targetDir = path.dirname(targetPath);
+
+        // Add error handling for subdirectory creation
+        try {
+          if (!fs.existsSync(targetDir)) {
+            fs.mkdirSync(targetDir, { recursive: true });
+          }
+        } catch (err) {
+          throw enhanceError(err as Error, {
+            code: ErrorCode.JAR_EXTRACTION_FAILED,
+            context: { jarPath, innerDir, targetDir }
+          });
+        }
+
+        // Add error handling for file write
+        try {
+          fs.writeFileSync(targetPath, entry.getData());
+        } catch (err) {
+          throw enhanceError(err as Error, {
+            code: ErrorCode.JAR_EXTRACTION_FAILED,
+            context: { jarPath, innerDir, targetPath }
+          });
+        }
+      }
+
+      extractionCache.set(cacheKey, extractDir);
+      return extractDir;
+    },
+    {
+      maxAttempts: 3,
+      initialDelayMs: 100,
+      maxDelayMs: 10000,
+      backoffMultiplier: 10,
+      shouldRetry: (error) => {
+        const code = classifyError(error);
+        return code === ErrorCode.JAR_LOCKED || code === ErrorCode.JAR_EXTRACTION_FAILED;
+      }
     }
-
-    fs.writeFileSync(targetPath, entry.getData());
-  }
-
-  extractionCache.set(cacheKey, extractDir);
-  return extractDir;
+  );
 }
 
 export function resolveJarfilePath(uri: string): string {
