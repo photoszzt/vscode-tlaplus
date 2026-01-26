@@ -126,16 +126,43 @@ Add support for configuration files:
 - Environment-specific settings
 
 ### 7. Error Recovery
-**Status:** Basic error handling
-**Effort:** Medium
-**Impact:** Low
+**Status:** ✅ Implemented
+**Effort:** Complete
+**Impact:** High
 
-Improve handling of partial failures:
+Comprehensive error recovery system now in place:
 
-- Retry transient errors
-- Graceful degradation when tools unavailable
-- Better error context and stack traces
-- Structured error codes
+**Retry Logic:**
+- Automatic retries for transient errors (Java spawn failures, JAR file locks, file system delays)
+- Exponential backoff: 100ms → 1s → 10s (max 3 attempts)
+- Synchronous retry support for blocking operations
+
+**Structured Error Codes:**
+- 17 error codes covering Java, file system, JAR, parse, process, and configuration errors
+- Classification as transient (retriable) or permanent (requires user intervention)
+- Error code taxonomy in `src/utils/errors/error-codes.ts`
+
+**Enhanced Error Context:**
+- `EnhancedError` class with metadata, timestamps, and stack traces
+- Retry attempt tracking in error metadata
+- Verbose mode (VERBOSE=1 or DEBUG=1) for full stack traces
+
+**Suggested Actions:**
+- All errors include actionable remediation steps based on error code
+- Context-specific suggestions (e.g., "Install Java 17 or later" for JAVA_NOT_FOUND)
+- Retry exhaustion messages when retries fail
+
+**Graceful Degradation:**
+- Module scanning continues even if some paths fail
+- Partial results with warnings for non-critical failures
+- MCP protocol compliance maintained (all errors return text responses)
+
+Implementation:
+- `src/utils/errors/` - Error infrastructure (codes, classifier, retry, context)
+- `src/tools/sany.ts` - Error formatting for SANY tools
+- `src/tools/tlc.ts` - Error formatting for TLC tools
+- `docs/ERROR-CODES.md` - Complete error code reference
+- 30 new tests for error utilities with 95%+ coverage
 
 ## Low Priority
 

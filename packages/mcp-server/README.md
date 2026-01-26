@@ -321,6 +321,94 @@ Resources are accessible via URI: `tlaplus://knowledge/<filename>`
 **Solution:**
 If using `--working-dir`, ensure the file path is within that directory. Otherwise, the server allows access to any file.
 
+## Error Recovery
+
+The server implements comprehensive error recovery with automatic retries for transient failures:
+
+### Automatic Retry Behavior
+
+Transient errors (file locks, Java spawn failures, I/O errors) are automatically retried with exponential backoff:
+
+- **Attempt 1**: Immediate
+- **Attempt 2**: After 100ms delay
+- **Attempt 3**: After 1s delay
+- **Attempt 4**: After 10s delay (max)
+
+Maximum 3 retry attempts before returning error to client.
+
+### Structured Error Codes
+
+All errors include structured error codes for better diagnostics:
+
+```
+Error [JAVA_NOT_FOUND]: Java executable not found in "/invalid/path"
+
+Suggested Actions:
+- Install Java 17 or later
+- Set JAVA_HOME environment variable
+- Use --java-home to specify Java location
+```
+
+Error codes classify failures as:
+- **Transient** - Automatically retried (JAR_LOCKED, JAVA_SPAWN_FAILED, FILE_BUSY)
+- **Permanent** - Require user intervention (FILE_NOT_FOUND, JAVA_NOT_FOUND, PARSE_SYNTAX_ERROR)
+
+### Common Error Codes
+
+| Code | Type | Description |
+|------|------|-------------|
+| `JAVA_NOT_FOUND` | Permanent | Java not installed or misconfigured |
+| `JAVA_SPAWN_FAILED` | Transient | Failed to start Java (retried automatically) |
+| `FILE_NOT_FOUND` | Permanent | File does not exist |
+| `FILE_BUSY` | Transient | File locked by another process |
+| `JAR_LOCKED` | Transient | JAR file locked (common on Windows with antivirus) |
+| `JAR_ENTRY_NOT_FOUND` | Permanent | Entry not found in JAR archive |
+| `CONFIG_TOOLS_NOT_FOUND` | Permanent | TLA+ tools not configured |
+
+See [docs/ERROR-CODES.md](./docs/ERROR-CODES.md) for complete error code reference.
+
+### Verbose Mode
+
+Enable detailed error diagnostics with environment variables:
+
+```bash
+VERBOSE=1 tlaplus-mcp-server
+# or
+DEBUG=1 tlaplus-mcp-server
+```
+
+Verbose mode includes:
+- Full stack traces for all errors
+- Detailed error context (file paths, retry attempts)
+- Enhanced debugging information
+
+### Retry Examples
+
+**File lock (Windows antivirus scanning JAR):**
+```
+Error [JAR_LOCKED]: Cannot access tla2tools.jar
+
+Suggested Actions:
+- Close other programs using the JAR file
+- Check for antivirus software locking files
+
+Failed after 3 retry attempts.
+```
+
+**Java spawn failure (recovered on retry):**
+```
+# First attempt fails, retried automatically
+# Second attempt succeeds - no error shown to user
+```
+
+### Graceful Degradation
+
+The server continues operating when non-critical errors occur:
+
+- **Module scanning**: Returns available modules even if some paths fail
+- **JAR scanning**: Logs warnings for corrupted JARs but continues
+- **Path detection**: Falls back to manual configuration if auto-detection fails
+
 ## Architecture
 
 The server is organized into:
