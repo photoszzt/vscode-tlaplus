@@ -185,8 +185,9 @@ describe('TLC Tools', () => {
         fileName: '/mock/spec.tla'
       });
 
-      expectMcpErrorResponse(response, 'Error running TLC model check');
+      expectMcpErrorResponse(response, 'Error [FILE_IO_ERROR]');
       expectMcpErrorResponse(response, 'Java heap space');
+      expectMcpErrorResponse(response, 'Suggested Actions:');
     });
   });
 
@@ -355,8 +356,9 @@ describe('TLC Tools', () => {
         behaviorLength: 5
       });
 
-      expectMcpErrorResponse(response, 'Error exploring TLC behaviors');
+      expectMcpErrorResponse(response, 'Error [FILE_IO_ERROR]');
       expectMcpErrorResponse(response, 'Invalid configuration');
+      expectMcpErrorResponse(response, 'Suggested Actions:');
     });
   });
 });

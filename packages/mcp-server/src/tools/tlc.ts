@@ -4,6 +4,66 @@ import * as path from 'path';
 import { ServerConfig } from '../types';
 import { resolveAndValidatePath } from '../utils/paths';
 import { getSpecFiles, runTlcAndWait } from '../utils/tlc-helpers';
+import { EnhancedError, enhanceError, ErrorCode } from '../utils/errors';
+
+/**
+ * Format an error response with error code and suggested actions
+ */
+function formatErrorResponse(error: Error): string {
+  const enhanced = error instanceof EnhancedError ? error : enhanceError(error);
+
+  const parts = [
+    `Error [${enhanced.code}]: ${error.message}`,
+    '',
+    'Suggested Actions:',
+    ...getSuggestedActions(enhanced.code)
+  ];
+
+  if (enhanced.metadata.retriesExhausted) {
+    parts.push('', `Failed after ${enhanced.metadata.retryAttempt} retry attempts.`);
+  }
+
+  if (process.env.VERBOSE || process.env.DEBUG) {
+    parts.push('', 'Stack Trace:', enhanced.metadata.stack || 'N/A');
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Get suggested actions based on error code
+ */
+function getSuggestedActions(code: ErrorCode): string[] {
+  const suggestions: Partial<Record<ErrorCode, string[]>> = {
+    [ErrorCode.JAVA_NOT_FOUND]: [
+      '- Install Java 17 or later',
+      '- Set JAVA_HOME environment variable',
+      '- Use --java-home to specify Java location'
+    ],
+    [ErrorCode.CONFIG_TOOLS_NOT_FOUND]: [
+      '- Use --tools-dir to specify TLA+ tools location',
+      '- Ensure tla2tools.jar exists in tools directory'
+    ],
+    [ErrorCode.FILE_NOT_FOUND]: [
+      '- Verify the file path is correct',
+      '- Check file permissions'
+    ],
+    [ErrorCode.JAR_LOCKED]: [
+      '- Close other programs using the JAR file',
+      '- Check for antivirus software locking files'
+    ],
+    [ErrorCode.JAR_ENTRY_NOT_FOUND]: [
+      '- Verify the jarfile URI is correct',
+      '- Check that the JAR file contains the expected module'
+    ],
+    [ErrorCode.JAR_EXTRACTION_FAILED]: [
+      '- Check available disk space',
+      '- Verify write permissions to temp directory'
+    ]
+  };
+
+  return suggestions[code] || ['- Check error message for details'];
+}
 
 /**
  * Register all TLC tools with the MCP server
@@ -102,7 +162,7 @@ export async function registerTlcTools(
         return {
           content: [{
             type: 'text',
-            text: `Error running TLC model check: ${error instanceof Error ? error.message : String(error)}`
+            text: formatErrorResponse(error as Error)
           }]
         };
       }
@@ -197,7 +257,7 @@ export async function registerTlcTools(
         return {
           content: [{
             type: 'text',
-            text: `Error running TLC smoke test: ${error instanceof Error ? error.message : String(error)}`
+            text: formatErrorResponse(error as Error)
           }]
         };
       }
@@ -300,7 +360,7 @@ export async function registerTlcTools(
         return {
           content: [{
             type: 'text',
-            text: `Error exploring TLC behaviors: ${error instanceof Error ? error.message : String(error)}`
+            text: formatErrorResponse(error as Error)
           }]
         };
       }
