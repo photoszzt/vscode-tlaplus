@@ -3,7 +3,7 @@
 **Project:** Standalone MCP Server for TLA+ Tools
 **Status:** ✅ Complete (Not Published)
 **Date Completed:** 2026-01-21
-**Last Updated:** 2026-01-23 (JAR module scanning implemented; 252 tests passing)
+**Last Updated:** 2026-01-26 (JAR module scanning implemented; 283 tests passing; error recovery implemented)
 
 ## Overview
 
@@ -68,6 +68,18 @@ Successfully implemented a fully functional Model Context Protocol (MCP) server 
 - Added TESTING.md and updated README with test commands and badges
 - Achieved 95%+ code coverage across all components
 
+### ✅ Phase 8: Error Recovery & Resilience
+- Implemented comprehensive error recovery system with automatic retry
+- Created structured error code taxonomy (17 error codes)
+- Built error classifier with errno and message pattern matching
+- Added EnhancedError class with metadata, timestamps, and stack traces
+- Implemented exponential backoff retry (100ms → 1s → 10s, max 3 attempts)
+- Integrated retry into Java spawning and JAR extraction
+- Added error formatting to all tool handlers with suggested actions
+- Created ERROR-CODES.md reference documentation
+- Updated README.md with Error Recovery section
+- **Added 30+ error utility tests; now 20 test suites with 283 tests passing**
+
 ## Deliverables
 
 ### Code Structure
@@ -107,6 +119,13 @@ packages/mcp-server/
 │       │   ├── sany.test.ts           # SANY utilities tests
 │       │   ├── jarfile.test.ts        # JAR file utilities tests (21 tests)
 │       │   └── integration.test.ts    # Integration tests
+│       ├── errors/              # Error recovery infrastructure
+│       │   ├── __tests__/       # Error utility tests (4 suites, 30 tests)
+│       │   ├── error-codes.ts   # Error code taxonomy (17 codes)
+│       │   ├── error-classifier.ts  # Error classification logic
+│       │   ├── error-context.ts # EnhancedError with metadata
+│       │   ├── retry.ts         # Retry with exponential backoff
+│       │   └── index.ts         # Public API
 │       ├── symbols/            # Symbol extraction subsystem
 │       │   ├── __tests__/      # Symbol extraction tests (6 suites)
 │       │   ├── best-guess.ts   # Init/Next/Spec heuristics
@@ -172,7 +191,7 @@ All TLA+ knowledge base articles registered as resources:
 ## Test Results
 
 ### Jest Automated Tests
-- ✅ **16 test suites, 252 tests passing** (4 skipped when JAR not present)
+- ✅ **20 test suites, 283 tests passing** (4 skipped when JAR not present)
 - ✅ **Coverage: 95%+ across all components**
 - ✅ Coverage thresholds met (70% branches/functions, 80% lines/statements)
 - ✅ **Utility tests**: paths, java, sany, jarfile utilities
@@ -181,6 +200,7 @@ All TLA+ knowledge base articles registered as resources:
 - ✅ **Tool handler tests**: SANY tools (26 tests), TLC tools (18 tests), knowledge base (10 tests)
 - ✅ **Server lifecycle tests**: initialization, stdio mode, HTTP mode (25 tests)
 - ✅ **Integration tests**: end-to-end utility workflows, JAR module scanning
+- ✅ **Error recovery tests**: error codes, classifier, retry, context (30 tests)
 - ✅ CI compatibility verified with test:ci script
 
 ### Test Coverage by Component
@@ -190,6 +210,7 @@ All TLA+ knowledge base articles registered as resources:
 | **src/tools/knowledge.ts** | 100% | 83.33% | 100% | 100% |
 | **src/tools/sany.ts** | 100% | 86.95% | 100% | 100% |
 | **src/utils/jarfile.ts** | 95%+ | 90%+ | 100% | 95%+ |
+| **src/utils/errors/** | 98%+ | 95%+ | 100% | 98%+ |
 | **src/tools/tlc.ts** | 85.5% | 71.79% | 100% | 85.5% |
 | **src/utils/paths.ts** | 100% | 100% | 100% | 100% |
 | **src/utils/java.ts** | 98.23% | 97.56% | 94.44% | 98.16% |
@@ -233,6 +254,13 @@ All TLA+ knowledge base articles registered as resources:
 - Stream management for long-running operations
 - TypeScript type safety
 
+### Error Recovery
+- Automatic retry for transient errors (JAR locks, Java spawn failures, file system delays)
+- Structured error codes (17 codes) with suggested remediation actions
+- Enhanced error context with metadata, timestamps, and stack traces
+- Graceful degradation when non-critical operations fail
+- Verbose mode (VERBOSE=1/DEBUG=1) for detailed diagnostics
+
 ## Technical Highlights
 
 ### Architecture Decisions
@@ -249,6 +277,8 @@ All TLA+ knowledge base articles registered as resources:
 - Markdown frontmatter parsing
 - MCP SDK tool and resource registration
 - **JAR file reading with `adm-zip` and caching for module discovery**
+- Error recovery with retry and exponential backoff
+- Structured error codes and classification
 
 ## Known Limitations
 
@@ -284,7 +314,7 @@ All TLA+ knowledge base articles registered as resources:
 1. **TLC Statistics** - Parse and expose model checking statistics
 2. **Progress Reporting** - Stream progress updates during long operations
 3. **Configuration File** - Support config file in addition to CLI args
-4. **Error Recovery** - Better handling of partial failures
+4. ~~Error Recovery~~ - ✅ Implemented (see Phase 8)
 
 ### Low Priority
 1. **Docker Image** - Containerized distribution
